@@ -1,0 +1,126 @@
+# This file configures Charmcraft.
+# See https://documentation.ubuntu.com/charmcraft/stable/reference/files/charmcraft-yaml-file/
+type: charm
+name: fastapi-demo
+title: Web Server Demo
+summary: A demo charm that operates a small Python FastAPI server.
+description: |
+  This charm demonstrates how to write a Kubernetes charm with Ops
+
+# Documentation:
+# https://documentation.ubuntu.com/charmcraft/stable/howto/build-guides/select-platforms/
+base: ubuntu@24.04
+platforms:
+  amd64:
+  arm64:
+
+assumes:
+  - juju >= 3.6
+  - k8s-api
+
+parts:
+  charm:
+    plugin: uv
+    source: .
+    build-snaps:
+      - astral-uv
+
+# (Optional) Configuration options for the charm
+# This config section defines charm config options, and populates the Configure
+# tab on Charmhub.
+# More information on this section at:
+# https://documentation.ubuntu.com/charmcraft/stable/reference/files/charmcraft-yaml-file/#config
+# General configuration documentation:
+# https://documentation.ubuntu.com/juju/3.6/reference/configuration/#application-configuration
+config:
+  options:
+    # An example config option to customise the log level of the workload
+    log-level:
+      description: |
+        Configures the log level of the workload.
+
+        Acceptable values are: "info", "debug", "warning", "error" and "critical"
+      default: "info"
+      type: string
+    # A config option that points to a user-provided secret containing an API token.
+    # See https://canonical.com/juju/docs/juju-cli/3.6/howto/manage-secrets/
+    api-token:
+      description: |
+        URI of a Juju user secret containing the API token for the workload.
+        The secret must have a 'token' key.
+
+        Create the secret: juju add-secret my-api-token token=<value>
+                           (returns a URI)
+        Grant access:      juju grant-secret <uri> fastapi-demo
+        Set this option:   juju config fastapi-demo api-token=<uri>
+      type: secret
+    server-port:
+      default: 8000
+      description: Default port on which FastAPI is available
+      type: int
+
+# (Optional) Actions that an operator can run against a unit.
+# More information on this section at:
+# https://canonical.com/juju/docs/charmcraft/stable/reference/files/charmcraft-yaml-file/#actions
+# General actions documentation:
+# https://canonical.com/juju/docs/juju-cli/3.6/reference/action/
+actions:
+  restart:
+    description: |
+      Restart the workload service in the container.
+
+      Use this to apply a change that the workload only picks up on startup,
+      or to recover a workload that has stopped responding.
+  get-db-info:
+    description: Fetches database authentication information
+    params:
+      show-password:
+        description: Show username and password in output information
+        type: boolean
+        default: false
+    additionalProperties: false
+
+requires:
+  database:
+    interface: postgresql_client
+    limit: 1
+    optional: false
+  logging:
+    interface: loki_push_api
+    optional: true
+
+provides:
+  metrics-endpoint:
+    interface: prometheus_scrape
+    optional: true
+  grafana-dashboard:
+    interface: grafana_dashboard
+    optional: true
+
+charm-libs:
+  - lib: data_platform_libs.data_interfaces
+    version: "0"
+  - lib: grafana_k8s.grafana_dashboard
+    version: "0"
+  - lib: loki_k8s.loki_push_api
+    version: "1"
+  - lib: observability_libs.juju_topology
+    version: "0"
+  - lib: prometheus_k8s.prometheus_scrape
+    version: "0"
+containers:
+  demo-server:
+    resource: demo-server-image
+
+# This field populates the Resources tab on Charmhub.
+# https://documentation.ubuntu.com/charmcraft/stable/reference/files/charmcraft-yaml-file/#resources
+resources:
+  demo-server-image:
+    type: oci-image
+    description: OCI image from GitHub Container registry
+    # The upstream-source field is ignored by Charmcraft and Juju, but it can be
+    # useful to developers in identifying the source of the OCI image. It is also
+    # used by the 'canonical/charming-actions' GitHub action for automated releases.
+    # The test_deploy function in tests/integration/test_charm.py reads upstream-source
+    # to determine which OCI image to use when running the charm's integration tests.
+    upstream-source: ghcr.io/canonical/api_demo_server/api-demo-server:3.0.0

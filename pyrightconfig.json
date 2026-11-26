@@ -1,0 +1,5 @@
+{
+  "venvPath": ".tox",
+  "venv": "py314",
+  "extraPaths": ["src", "lib"]
+}
